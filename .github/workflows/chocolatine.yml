@@ -1,0 +1,85 @@
+
+name: Chocolatine
+
+on:
+  push:
+    branches-ignore:
+      - 'ga-ignore-*'
+  pull_request:
+    branches-ignore:
+      - 'ga-ignore-*'
+
+env:
+  EXECUTABLES: "my_pgp"
+
+jobs:
+  check_program_compilation:
+    runs-on: ubuntu-latest
+    container:
+      image: epitechcontent/epitest-docker
+    steps:
+        - name: Checkout Code
+          uses: actions/checkout@v3
+
+        - name: Check Program Compilation
+          run: |
+            timeout 20 make
+            make clean
+            IFS=:
+            for executable in $EXECUTABLES; do
+                if [ ! -f "$executable" ]; then
+                    echo "::error title=Build Failed::After the build, impossible to find this executable: $executable"
+                    exit 1
+                fi
+            done
+  
+  check_coding_style:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/epitech/coding-style-checker:latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+    
+      - name: Check Coding-Style Errors
+        run: |
+          check.sh $(pwd) $(pwd)
+          error=$(stat --format=%s coding-style-reports.log)
+          if (($error > 0)) then
+          while IFS=: read -r file line lvl error
+          do
+            if [[ "$file" != *"src/gui"* ]]; then
+              echo "::error title=${lvl} coding style error,file=${file},#line=${line}::${error}"
+            fi
+          done < "coding-style-reports.log"
+          exit 1
+          fi
+
+  check_tests:
+    runs-on: ubuntu-latest
+    container:
+      image: epitechcontent/epitest-docker
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v3
+      - name: test-run
+        run: |
+          output=$(make -s tests_run 2>&1)
+          tests=$(echo "$output" | grep -E "^\[====\] Synthesis:")
+          v_exit=0
+          printf "%s\n" "$tests" | while IFS=":|" read -r title t_tested v_tested t_passing v_passing t_failing v_failing t_crashing v_crashing; do
+              if [ "$v_failing" -gt 0 ]; then
+                  echo "::error::$v_failing/$v_tested test(s) have failed.";
+                  v_exit=1;
+              fi;
+              if [ "$v_crashing" -gt 0 ]; then
+                  echo "::error::$v_crashing/$v_tested test(s) have crashed.";
+                  v_exit=1;
+              fi;
+              
+              if [ "$v_failing" -eq 0 ] && [ "$v_crashing" -eq 0 ]; then
+                  echo "::notice::$v_passing/$v_tested test(s) have passed.";
+              fi;
+
+              exit $v_exit
+          done

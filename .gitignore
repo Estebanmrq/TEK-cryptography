@@ -1,0 +1,20 @@
+# Byte-compiled / optimized / DLL files
+__pycache__
+*.o
+*.gc*
+my_pgp
+unit_tests
+
+# Documentation html code
+docs/html
+
+# Temporary files
+*.tmp
+ciphered
+message
+
+# Configuration files
+.vscode
+
+# temporary ingnored files
+Doxyfile
